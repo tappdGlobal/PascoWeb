@@ -52,6 +52,11 @@ export function NewJobRequest({ onSuccess }: NewJobRequestProps) {
   const [technician, setTechnician] = useState("");
   const [arrivalDate, setArrivalDate] = useState<Date>(new Date());
   const [estimatedCompletion, setEstimatedCompletion] = useState<Date | undefined>(undefined);
+  const [groupName, setGroupName] = useState("");
+  const [callbackDate, setCallbackDate] = useState<Date | undefined>(undefined);
+  const [labourAmt, setLabourAmt] = useState<string>("");
+  const [partAmt, setPartAmt] = useState<string>("");
+  const [billAmount, setBillAmount] = useState<string>("");
   
   // Insurance fields
   const [insuranceCompany, setInsuranceCompany] = useState("");
@@ -100,6 +105,12 @@ export function NewJobRequest({ onSuccess }: NewJobRequestProps) {
       technician,
       estimatedCompletion,
       arrivalDate,
+      jobCardNumber: '',
+      groupName: groupName || undefined,
+      callbackDate: callbackDate ?? undefined,
+      labourAmt: labourAmt ? Number(labourAmt) : undefined,
+      partAmt: partAmt ? Number(partAmt) : undefined,
+      billAmount: billAmount ? Number(billAmount) : undefined,
       insuranceCompany: jobType === "Insurance" ? insuranceCompany : undefined,
       claimNumber: jobType === "Insurance" ? claimNumber : undefined,
       surveyorName: jobType === "Insurance" ? surveyorName : undefined,
@@ -211,6 +222,53 @@ export function NewJobRequest({ onSuccess }: NewJobRequestProps) {
                 placeholder="Pearl White"
                 className="mt-1"
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Group Name</Label>
+              <Input type="text" value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Group or Batch name" className="mt-1" />
+            </div>
+            <div>
+              <Label>Callback Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full mt-1 justify-start text-left font-normal",
+                      !callbackDate && "text-gray-500"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formatDate(callbackDate)}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={callbackDate}
+                    onSelect={(date) => date && setCallbackDate(date)}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          {/* Billing fields */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label>Labour Amount</Label>
+              <Input type="number" value={labourAmt} onChange={(e) => setLabourAmt(e.target.value)} placeholder="0" className="mt-1" />
+            </div>
+            <div>
+              <Label>Parts Amount</Label>
+              <Input type="number" value={partAmt} onChange={(e) => setPartAmt(e.target.value)} placeholder="0" className="mt-1" />
+            </div>
+            <div>
+              <Label>Bill Amount</Label>
+              <Input type="number" value={billAmount} onChange={(e) => setBillAmount(e.target.value)} placeholder="0" className="mt-1" />
             </div>
           </div>
 

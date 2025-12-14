@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { Package, Search, AlertTriangle, CheckCircle, TrendingDown } from "lucide-react";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
+import supabase from "../supabase/client";
 
 interface InventoryDialogProps {
   open: boolean;
@@ -13,85 +14,49 @@ interface InventoryDialogProps {
 
 export function InventoryDialog({ open, onOpenChange }: InventoryDialogProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
 
-  const inventoryItems = [
-    { 
-      name: "Engine Oil (5W-30)", 
-      quantity: 3, 
-      minRequired: 10, 
-      price: "₹1,500",
-      category: "Fluids",
-      supplier: "Castrol",
-      status: "critical"
-    },
-    { 
-      name: "Brake Pads (Premium)", 
-      quantity: 5, 
-      minRequired: 15, 
-      price: "₹1,750",
-      category: "Brake System",
-      supplier: "Bosch",
-      status: "low"
-    },
-    { 
-      name: "Air Filters", 
-      quantity: 4, 
-      minRequired: 12, 
-      price: "₹600",
-      category: "Filters",
-      supplier: "Mann Filter",
-      status: "low"
-    },
-    { 
-      name: "Paint - White (5L)", 
-      quantity: 2, 
-      minRequired: 8, 
-      price: "₹6,000",
-      category: "Paint",
-      supplier: "Nippon Paint",
-      status: "critical"
-    },
-    { 
-      name: "Spark Plugs", 
-      quantity: 24, 
-      minRequired: 20, 
-      price: "₹250",
-      category: "Ignition",
-      supplier: "NGK",
-      status: "good"
-    },
-    { 
-      name: "Coolant (1L)", 
-      quantity: 18, 
-      minRequired: 15, 
-      price: "₹450",
-      category: "Fluids",
-      supplier: "Castrol",
-      status: "good"
-    },
-    { 
-      name: "Polishing Compound", 
-      quantity: 8, 
-      minRequired: 10, 
-      price: "₹850",
-      category: "Detailing",
-      supplier: "3M",
-      status: "low"
-    },
-    { 
-      name: "Headlight Bulbs (LED)", 
-      quantity: 15, 
-      minRequired: 12, 
-      price: "₹1,200",
-      category: "Electrical",
-      supplier: "Philips",
-      status: "good"
-    },
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.from('inventory').select('*').limit(300);
+        if (error) {
+          // if table doesn't exist or permission error, fall back to defaults
+          return;
+        }
+        if (mounted && Array.isArray(data)) {
+          // normalize fields to expected shape
+          const normalized = data.map((it: any) => ({
+            name: it.name || it.item_name || 'Unnamed',
+            quantity: it.quantity ?? it.qty ?? 0,
+            minRequired: it.min_required ?? it.minRequired ?? 10,
+            price: it.unit_price ? `₹${it.unit_price}` : (it.price || '₹0'),
+            category: it.category || 'General',
+            supplier: it.supplier || it.vendor || 'Unknown',
+          }));
+          setInventoryItems(normalized);
+        }
+      } catch (e) {
+        // ignore and keep defaults if any
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // fallback defaults if inventory table is not present
+  const defaultItems = [
+    { name: 'Engine Oil (5W-30)', quantity: 3, minRequired: 10, price: '₹1,500', category: 'Fluids', supplier: 'Castrol' },
+    { name: 'Brake Pads (Premium)', quantity: 5, minRequired: 15, price: '₹1,750', category: 'Brake System', supplier: 'Bosch' },
+    { name: 'Air Filters', quantity: 4, minRequired: 12, price: '₹600', category: 'Filters', supplier: 'Mann Filter' },
+    { name: 'Paint - White (5L)', quantity: 2, minRequired: 8, price: '₹6,000', category: 'Paint', supplier: 'Nippon Paint' },
   ];
 
-  const filteredItems = inventoryItems.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchQuery.toLowerCase())
+  const itemsToRender = inventoryItems.length > 0 ? inventoryItems : defaultItems;
+
+  const filteredItems = itemsToRender.filter((item: any) =>
+    (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.category || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getStatusIcon = (status: string) => {
@@ -124,11 +89,16 @@ export function InventoryDialog({ open, onOpenChange }: InventoryDialogProps) {
     toast.success(`Order placed for ${itemName}`);
   };
 
-  const criticalCount = inventoryItems.filter(i => i.status === "critical").length;
-  const lowCount = inventoryItems.filter(i => i.status === "low").length;
-  const totalValue = inventoryItems.reduce((sum, item) => {
-    const price = parseInt(item.price.replace(/[₹,]/g, ''));
-    return sum + (price * item.quantity);
+  const criticalCount = itemsToRender.filter((i: any) => (i.status || (i.quantity < i.minRequired ? 'low' : 'good')) === "critical").length;
+  const lowCount = itemsToRender.filter((i: any) => (i.status || (i.quantity < i.minRequired ? 'low' : 'good')) === "low").length;
+  const totalValue = itemsToRender.reduce((sum: number, item: any) => {
+    try {
+      const priceRaw = String(item.price || '').replace(/[₹,]/g, '');
+      const price = Number(priceRaw) || 0;
+      return sum + (price * (Number(item.quantity) || 0));
+    } catch (e) {
+      return sum;
+    }
   }, 0);
 
   return (
@@ -143,9 +113,9 @@ export function InventoryDialog({ open, onOpenChange }: InventoryDialogProps) {
 
         <div className="space-y-4">
           {/* Summary Cards */}
-          <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3">
             <div className="p-3 bg-blue-50 rounded-xl text-center">
-              <p className="text-2xl font-bold text-blue-600">{inventoryItems.length}</p>
+              <p className="text-2xl font-bold text-blue-600">{itemsToRender.length}</p>
               <p className="text-xs text-blue-700">Total Items</p>
             </div>
             <div className="p-3 bg-red-50 rounded-xl text-center">

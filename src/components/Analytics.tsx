@@ -105,39 +105,61 @@ export function Analytics() {
   ];
 
   // Monthly trend data (mock)
-  const monthlyData = [
-    { month: "Jul", jobs: 45, revenue: 180000 },
-    { month: "Aug", jobs: 52, revenue: 215000 },
-    { month: "Sep", jobs: 48, revenue: 195000 },
-    { month: "Oct", jobs: 61, revenue: 245000 },
-    { month: "Nov", jobs: 58, revenue: 235000 },
-    { month: "Dec", jobs: totalJobs, revenue: totalRevenue }
-  ];
+  // Monthly trend data (computed from jobs)
+  const monthMap: Record<string, { jobs: number; revenue: number }> = {};
+  // Build last 6 months labels
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = d.toLocaleString("en-US", { month: "short" });
+    monthMap[key] = { jobs: 0, revenue: 0 };
+  }
+  jobs.forEach((j) => {
+    const date = j.createdAt ? new Date(j.createdAt) : new Date();
+    const key = date.toLocaleString("en-US", { month: "short" });
+    if (!monthMap[key]) monthMap[key] = { jobs: 0, revenue: 0 };
+    monthMap[key].jobs += 1;
+    const rev = Number(j.billAmount ?? j.services?.reduce((s, it) => s + (it?.estimatedCost ?? 0), 0) ?? 0) || 0;
+    monthMap[key].revenue += rev;
+  });
+  const monthlyData = Object.keys(monthMap).map((k) => ({ month: k, jobs: monthMap[k].jobs, revenue: monthMap[k].revenue }));
 
-  // Technician performance (mock)
-  const technicianData = [
-    { name: "Suresh Y.", completed: 28, avg: 4.8 },
-    { name: "Ramesh K.", completed: 24, avg: 4.6 },
-    { name: "Vijay S.", completed: 19, avg: 4.5 },
-    { name: "Prakash M.", completed: 15, avg: 4.3 }
-  ];
+  // Technician performance (computed)
+  const techMap: Record<string, { completed: number; revenue: number }> = {};
+  jobs.forEach((j) => {
+    const tech = j.technician || "Unknown";
+    if (!techMap[tech]) techMap[tech] = { completed: 0, revenue: 0 };
+    if (j.status === "Completed") techMap[tech].completed += 1;
+    const rev = Number(j.billAmount ?? j.services?.reduce((s, it) => s + (it?.estimatedCost ?? 0), 0) ?? 0) || 0;
+    techMap[tech].revenue += rev;
+  });
+  const technicianData = Object.keys(techMap).map((k) => ({ name: k, completed: techMap[k].completed, revenue: techMap[k].revenue }));
 
-  // Advisor performance (mock)
-  const advisorData = [
-    { name: "Amit Singh", jobs: 42, revenue: 185000 },
-    { name: "Sneha Verma", jobs: 38, revenue: 162000 },
-    { name: "Rajesh Kumar", jobs: 31, revenue: 145000 }
-  ];
+  // Advisor performance (computed)
+  const advMap: Record<string, { jobs: number; revenue: number }> = {};
+  jobs.forEach((j) => {
+    const adv = j.advisor || "Unknown";
+    if (!advMap[adv]) advMap[adv] = { jobs: 0, revenue: 0 };
+    advMap[adv].jobs += 1;
+    const rev = Number(j.billAmount ?? j.services?.reduce((s, it) => s + (it?.estimatedCost ?? 0), 0) ?? 0) || 0;
+    advMap[adv].revenue += rev;
+  });
+  const advisorData = Object.keys(advMap).map((k) => ({ name: k, jobs: advMap[k].jobs, revenue: advMap[k].revenue }));
 
-  // Stage completion time (mock)
-  const stageTimeData = [
-    { stage: "Estimate", avgDays: 1.2 },
-    { stage: "Approval", avgDays: 2.5 },
-    { stage: "Parts", avgDays: 3.8 },
-    { stage: "Work", avgDays: 4.2 },
-    { stage: "Painting", avgDays: 2.1 },
-    { stage: "QC", avgDays: 0.8 }
-  ];
+  // Stage completion time - approximate average (based on createdAt -> updatedAt)
+  const stageMap: Record<string, { totalDays: number; count: number }> = {};
+  jobs.forEach((j) => {
+    const stage = j.currentStage || "Unknown";
+    const created = j.createdAt ? new Date(j.createdAt) : null;
+    const updated = j.updatedAt ? new Date(j.updatedAt) : null;
+    if (created && updated) {
+      const days = Math.max(0, (updated.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+      if (!stageMap[stage]) stageMap[stage] = { totalDays: 0, count: 0 };
+      stageMap[stage].totalDays += days;
+      stageMap[stage].count += 1;
+    }
+  });
+  const stageTimeData = Object.keys(stageMap).map((k) => ({ stage: k, avgDays: +(stageMap[k].totalDays / Math.max(1, stageMap[k].count)).toFixed(2) }));
 
   return (
     <div className="space-y-4">

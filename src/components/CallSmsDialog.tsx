@@ -3,8 +3,9 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Phone, MessageSquare, User, Car } from "lucide-react";
 import { Job } from "./BodyshopDataContext";
-import { toast } from "sonner@2.0.3";
-import { useState } from "react";
+import { toast } from "sonner";
+import { useState, useEffect } from "react";
+import supabase from "../supabase/client";
 
 interface CallSmsDialogProps {
   open: boolean;
@@ -30,12 +31,32 @@ export function CallSmsDialog({ open, onOpenChange, job, mode }: CallSmsDialogPr
     onOpenChange(false);
   };
 
-  const quickMessages = [
-    "Your vehicle is ready for pickup",
-    "Work in progress, will update soon",
-    "Please visit for approval",
-    "Payment pending, please clear dues",
-  ];
+  const [quickMessages, setQuickMessages] = useState<string[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.from('quick_messages').select('message').limit(50);
+        if (!error && Array.isArray(data) && mounted) {
+          setQuickMessages(data.map((r: any) => r.message).filter(Boolean));
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
+      // fallback
+      if (mounted && quickMessages.length === 0) {
+        setQuickMessages([
+          'Your vehicle is ready for pickup',
+          'Work in progress, will update soon',
+          'Please visit for approval',
+          'Payment pending, please clear dues',
+        ]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   if (!job) return null;
 

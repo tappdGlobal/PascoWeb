@@ -1,7 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { DollarSign, TrendingUp, TrendingDown, Download } from "lucide-react";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
+import { useBodyshopData } from "./BodyshopDataContext";
 
 interface RevenueDialogProps {
   open: boolean;
@@ -9,63 +10,103 @@ interface RevenueDialogProps {
 }
 
 export function RevenueDialog({ open, onOpenChange }: RevenueDialogProps) {
+  const { jobs } = useBodyshopData();
+
+  const startOf = (d: Date) => { const r = new Date(d); r.setHours(0,0,0,0); return r; };
+  const today = startOf(new Date());
+  const yesterday = startOf(new Date(Date.now() - 24*60*60*1000));
+  const startOfWeek = startOf(new Date()); startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+  const lastWeekStart = new Date(startOfWeek); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+
+  const revenueForRange = (from: Date, to: Date) => {
+    return jobs.filter((j: any) => {
+      const d = j.createdAt ? new Date(j.createdAt) : null;
+      if (!d) return false;
+      return d >= from && d < to;
+    }).reduce((s: number, j: any) => s + (Number(j.billAmount ?? j.services?.reduce((ss:any,it:any)=> ss + (it?.estimatedCost ?? 0),0) ?? 0) || 0), 0);
+  };
+
+  const countForRange = (from: Date, to: Date) => jobs.filter((j: any) => { const d = j.createdAt ? new Date(j.createdAt) : null; if (!d) return false; return d >= from && d < to; }).length;
+
+  // Build revenue entries and include average & change vs previous comparable period
+  const rToday = revenueForRange(today, new Date(today.getTime() + 24*60*60*1000));
+  const rYesterday = revenueForRange(yesterday, today);
+  const cToday = countForRange(today, new Date(today.getTime() + 24*60*60*1000));
+  const cYesterday = countForRange(yesterday, today);
+
+  const rThisWeek = revenueForRange(startOfWeek, new Date(startOfWeek.getTime() + 7*24*60*60*1000));
+  const rLastWeek = revenueForRange(lastWeekStart, startOfWeek);
+  const cThisWeek = countForRange(startOfWeek, new Date(startOfWeek.getTime() + 7*24*60*60*1000));
+  const cLastWeek = countForRange(lastWeekStart, startOfWeek);
+
+  const rThisMonth = revenueForRange(startOfMonth, new Date(startOfMonth.getFullYear(), startOfMonth.getMonth()+1,1));
+  const rLastMonth = revenueForRange(lastMonthStart, startOfMonth);
+  const cThisMonth = countForRange(startOfMonth, new Date(startOfMonth.getFullYear(), startOfMonth.getMonth()+1,1));
+  const cLastMonth = countForRange(lastMonthStart, startOfMonth);
+
   const revenueData = [
-    { 
-      period: "Today", 
-      amount: 45230, 
-      jobs: 8, 
-      avgPerJob: 5654,
-      change: 12,
-      trend: "up"
+    {
+      period: 'Today',
+      amount: rToday,
+      jobs: cToday,
+      avgPerJob: cToday ? Math.round(rToday / cToday) : 0,
+      change: rYesterday ? Math.round(((rToday - rYesterday) / Math.max(1, rYesterday)) * 100) : 0,
+      trend: rToday >= rYesterday ? 'up' : 'down'
     },
-    { 
-      period: "Yesterday", 
-      amount: 38500, 
-      jobs: 6, 
-      avgPerJob: 6417,
-      change: -5,
-      trend: "down"
+    {
+      period: 'Yesterday',
+      amount: rYesterday,
+      jobs: cYesterday,
+      avgPerJob: cYesterday ? Math.round(rYesterday / cYesterday) : 0,
+      change: 0,
+      trend: 'down'
     },
-    { 
-      period: "This Week", 
-      amount: 214500, 
-      jobs: 42, 
-      avgPerJob: 5107,
-      change: 18,
-      trend: "up"
+    {
+      period: 'This Week',
+      amount: rThisWeek,
+      jobs: cThisWeek,
+      avgPerJob: cThisWeek ? Math.round(rThisWeek / cThisWeek) : 0,
+      change: rLastWeek ? Math.round(((rThisWeek - rLastWeek) / Math.max(1, rLastWeek)) * 100) : 0,
+      trend: rThisWeek >= rLastWeek ? 'up' : 'down'
     },
-    { 
-      period: "Last Week", 
-      amount: 195000, 
-      jobs: 38, 
-      avgPerJob: 5132,
-      change: 8,
-      trend: "up"
+    {
+      period: 'Last Week',
+      amount: rLastWeek,
+      jobs: cLastWeek,
+      avgPerJob: cLastWeek ? Math.round(rLastWeek / cLastWeek) : 0,
+      change: 0,
+      trend: 'down'
     },
-    { 
-      period: "This Month", 
-      amount: 895000, 
-      jobs: 156, 
-      avgPerJob: 5737,
-      change: 15,
-      trend: "up"
+    {
+      period: 'This Month',
+      amount: rThisMonth,
+      jobs: cThisMonth,
+      avgPerJob: cThisMonth ? Math.round(rThisMonth / cThisMonth) : 0,
+      change: rLastMonth ? Math.round(((rThisMonth - rLastMonth) / Math.max(1, rLastMonth)) * 100) : 0,
+      trend: rThisMonth >= rLastMonth ? 'up' : 'down'
     },
-    { 
-      period: "Last Month", 
-      amount: 778000, 
-      jobs: 142, 
-      avgPerJob: 5479,
-      change: 12,
-      trend: "up"
-    },
+    {
+      period: 'Last Month',
+      amount: rLastMonth,
+      jobs: cLastMonth,
+      avgPerJob: cLastMonth ? Math.round(rLastMonth / cLastMonth) : 0,
+      change: 0,
+      trend: 'down'
+    }
   ];
 
-  const categoryBreakdown = [
-    { category: "Paint & Body Work", amount: 385000, percentage: 43, color: "blue" },
-    { category: "Mechanical Repairs", amount: 268000, percentage: 30, color: "purple" },
-    { category: "Detailing Services", amount: 161000, percentage: 18, color: "orange" },
-    { category: "Insurance Claims", amount: 81000, percentage: 9, color: "green" },
-  ];
+  // Category breakdown by service_type
+  const catMap: Record<string, number> = {};
+  jobs.forEach((j: any) => {
+    const cat = j.jobType ?? 'Other';
+    const amt = Number(j.billAmount ?? j.services?.reduce((ss:any,it:any)=> ss + (it?.estimatedCost ?? 0),0) ?? 0) || 0;
+    if (!catMap[cat]) catMap[cat] = 0;
+    catMap[cat] += amt;
+  });
+  const totalRev = Object.values(catMap).reduce((s,a) => s + a, 0) || 1;
+  const categoryBreakdown = Object.keys(catMap).map(k => ({ category: k, amount: catMap[k], percentage: Math.round((catMap[k]/totalRev)*100), color: 'blue' }));
 
   const handleExport = () => {
     const report = `

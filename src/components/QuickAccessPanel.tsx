@@ -13,8 +13,9 @@ import {
   Share2,
   FolderOpen,
 } from "lucide-react";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { useState } from "react";
+import { useBodyshopData } from "./BodyshopDataContext";
 import { JobCardSelectorDialog } from "./JobCardSelectorDialog";
 import { CallSmsDialog } from "./CallSmsDialog";
 import { PhotoUploadDialog } from "./PhotoUploadDialog";
@@ -23,6 +24,7 @@ import { TimePunchDialog } from "./TimePunchDialog";
 import { Job } from "./BodyshopDataContext";
 
 export function QuickAccessPanel() {
+  const { jobs } = useBodyshopData();
   const [showJobSelector, setShowJobSelector] = useState(false);
   const [showCallDialog, setShowCallDialog] = useState(false);
   const [showSmsDialog, setShowSmsDialog] = useState(false);
@@ -97,6 +99,12 @@ export function QuickAccessPanel() {
       action: () => handleJobCardAction("photo")
     },
   ];
+
+  // derived quick stats from jobs
+  const openJobs = jobs.filter(j => String(j.status || '').toLowerCase() !== 'completed').length;
+  const today = new Date().toLocaleDateString();
+  const todaysJobs = jobs.filter(j => new Date(j.createdAt).toLocaleDateString() === today).length;
+  const followups = jobs.filter(j => Boolean((j as any).callbackDate || (j as any).nextFollowUp || (j as any).followUpDate)).length;
 
   const getColorClasses = (color: string) => {
     const colors: Record<string, { bg: string; text: string; hover: string }> = {

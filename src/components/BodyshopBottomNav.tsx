@@ -1,5 +1,6 @@
 import { Home, List, BarChart3, PhoneCall, Settings, UserCog } from "lucide-react";
 import { cn } from "./ui/utils";
+import { useBodyshopData } from "./BodyshopDataContext";
 
 interface BodyshopBottomNavProps {
   activeTab: string;
@@ -15,6 +16,9 @@ const navItems = [
 ];
 
 export function BodyshopBottomNav({ activeTab, onTabChange }: BodyshopBottomNavProps) {
+  const { jobs } = useBodyshopData();
+  const pendingCount = jobs.filter(j => String(j.status || '').toLowerCase() !== 'completed').length;
+  const followupCount = jobs.filter(j => Boolean((j as any).callbackDate || (j as any).followUpDate)).length;
   return (
     <nav className="fixed bottom-0 left-0 right-0 glass-card border-t border-blue-100 safe-bottom z-50">
       <div className="flex items-center justify-around px-0.5 py-2">
@@ -38,7 +42,15 @@ export function BodyshopBottomNav({ activeTab, onTabChange }: BodyshopBottomNavP
                   ? "bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg scale-110" 
                   : "hover:bg-blue-50"
               )}>
-                <Icon className={cn("w-5 h-5", isActive && "text-white")} />
+                <div className="relative">
+                  <Icon className={cn("w-5 h-5", isActive && "text-white")} />
+                  {item.id === 'jobs' && pendingCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">{pendingCount}</span>
+                  )}
+                  {item.id === 'followups' && followupCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-[10px] px-1 rounded-full">{followupCount}</span>
+                  )}
+                </div>
               </div>
               <span className={cn(
                 "text-[10px] leading-tight transition-all",

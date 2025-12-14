@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import supabase from "../supabase/client";
+import { toast } from "sonner@2.0.3";
 
 export type JobType = "Insurance" | "Cash" | "Warranty";
 export type JobStatus = "Service" | "In-Progress" | "Completed";
@@ -33,7 +35,6 @@ export interface Note {
 export interface CallLog {
   id: string;
   callDate: Date;
-  callDuration: string;
   remarks: string;
   nextFollowUp?: Date;
   calledBy: string;
@@ -101,6 +102,13 @@ export interface Job {
   callLogs: CallLog[];
   services: Service[];
   activityLog: ActivityLog[];
+  // Additional fields from CSV / Billing
+  groupName?: string;
+  callbackDate?: Date;
+  labourAmt?: number;
+  partAmt?: number;
+  billAmount?: number;
+  profit?: number;
   
   // Metadata
   createdAt: Date;
@@ -129,402 +137,107 @@ interface BodyshopDataContextType {
 
 const BodyshopDataContext = createContext<BodyshopDataContextType | undefined>(undefined);
 
-// Mock data
-const mockJobs: Job[] = [
-  {
-    id: "1",
-    jobCardNumber: "BS-2025-001",
-    regNo: "HR26DK8877",
-    model: "Maruti Suzuki Swift VXi",
-    vin: "MA3ERLF1S00234567",
-    color: "Pearl White",
-    fuelType: "Petrol",
-    year: "2022",
-    kmsDriven: "15,234",
-    customerName: "Rajesh Kumar",
-    customerMobile: "+91 9876543210",
-    jobType: "Insurance",
-    advisor: "Amit Singh",
-    technician: "Suresh Yadav",
-    estimatedCompletion: new Date("2025-12-15"),
-    arrivalDate: new Date("2025-12-09"),
-    insuranceCompany: "HDFC Ergo",
-    claimNumber: "CLM2025001234",
-    surveyorName: "Rahul Mehta",
-    approvedAmount: 45000,
-    status: "In-Progress",
-    currentStage: "Work in Progress",
-    completedStages: ["Job Created", "Estimate Prepared", "Estimate Sent", "Estimate Approved", "Parts Ordered"],
-    photos: [
-      {
-        id: "p1",
-        url: "https://images.unsplash.com/photo-1449130015084-2dc954a6f821?w=400",
-        category: "Front",
-        uploadedAt: new Date("2025-12-09")
-      }
-    ],
-    notes: [
-      {
-        id: "n1",
-        text: "Customer approved estimate. Parts ordered from supplier.",
-        createdAt: new Date("2025-12-10"),
-        createdBy: "Amit Singh"
-      }
-    ],
-    followUpDate: new Date("2025-12-14"),
-    interestStatus: "Interested",
-    callLogs: [
-      {
-        id: "c1",
-        callDate: new Date("2025-12-09T10:00:00"),
-        callDuration: "15 mins",
-        remarks: "Discussed estimate with customer",
-        nextFollowUp: new Date("2025-12-11"),
-        calledBy: "Amit Singh",
-        customerResponse: "Interested"
-      }
-    ],
-    services: [
-      {
-        id: "s1",
-        name: "Painting",
-        description: "Full body painting",
-        estimatedCost: 20000,
-        status: "In Progress"
-      }
-    ],
-    activityLog: [
-      {
-        id: "a1",
-        action: "Job created and assigned to Amit Singh",
-        timestamp: new Date("2025-12-09T09:00:00"),
-        user: "System"
-      },
-      {
-        id: "a2",
-        action: "Estimate prepared - ₹45,000",
-        timestamp: new Date("2025-12-09T11:30:00"),
-        user: "Amit Singh"
-      }
-    ],
-    createdAt: new Date("2025-12-09"),
-    updatedAt: new Date("2025-12-10")
-  },
-  {
-    id: "2",
-    jobCardNumber: "BS-2025-002",
-    regNo: "DL8CAF9356",
-    model: "Hyundai i20 Sportz",
-    vin: "MALH11BAXM1234567",
-    color: "Fiery Red",
-    fuelType: "Diesel",
-    year: "2021",
-    kmsDriven: "32,567",
-    customerName: "Priya Sharma",
-    customerMobile: "+91 9876543211",
-    jobType: "Cash",
-    advisor: "Sneha Verma",
-    estimatedCompletion: new Date("2025-12-12"),
-    arrivalDate: new Date("2025-12-08"),
-    status: "Service",
-    currentStage: "Estimate Prepared",
-    completedStages: ["Job Created"],
-    photos: [
-      {
-        id: "p2",
-        url: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=400",
-        category: "Rear",
-        uploadedAt: new Date("2025-12-08")
-      }
-    ],
-    notes: [],
-    followUpDate: new Date("2025-12-11"),
-    interestStatus: "Follow-Up Later",
-    callLogs: [
-      {
-        id: "c2",
-        callDate: new Date("2025-12-08T15:00:00"),
-        callDuration: "10 mins",
-        remarks: "Discussed rear bumper damage",
-        nextFollowUp: new Date("2025-12-11"),
-        calledBy: "Sneha Verma",
-        customerResponse: "Follow-Up Later"
-      }
-    ],
-    services: [
-      {
-        id: "s2",
-        name: "Bumper Repair",
-        description: "Rear bumper repair",
-        estimatedCost: 5000,
-        status: "Pending"
-      }
-    ],
-    activityLog: [
-      {
-        id: "a3",
-        action: "Job created - Rear bumper damage",
-        timestamp: new Date("2025-12-08T14:00:00"),
-        user: "System"
-      }
-    ],
-    createdAt: new Date("2025-12-08"),
-    updatedAt: new Date("2025-12-08")
-  },
-  {
-    id: "3",
-    jobCardNumber: "BS-2025-003",
-    regNo: "HR55AB1234",
-    model: "Honda City ZX",
-    vin: "MAHH11DE3K5678901",
-    color: "Platinum Silver",
-    fuelType: "Petrol",
-    year: "2023",
-    kmsDriven: "8,450",
-    customerName: "Amit Patel",
-    customerMobile: "+91 9876543212",
-    jobType: "Warranty",
-    advisor: "Amit Singh",
-    technician: "Ramesh Kumar",
-    estimatedCompletion: new Date("2025-12-10"),
-    arrivalDate: new Date("2025-12-05"),
-    status: "Completed",
-    currentStage: "Completed",
-    completedStages: ["Job Created", "Estimate Prepared", "Estimate Sent", "Estimate Approved", "Parts Ordered", "Work in Progress", "Painting", "Quality Check", "Ready for Delivery", "Completed"],
-    photos: [],
-    notes: [
-      {
-        id: "n2",
-        text: "Paint job completed successfully. Customer very satisfied.",
-        createdAt: new Date("2025-12-09"),
-        createdBy: "Amit Singh"
-      }
-    ],
-    callLogs: [
-      {
-        id: "c3",
-        callDate: new Date("2025-12-09T16:00:00"),
-        callDuration: "5 mins",
-        remarks: "Delivered vehicle to customer",
-        calledBy: "Amit Singh",
-        customerResponse: "Satisfied"
-      }
-    ],
-    services: [
-      {
-        id: "s3",
-        name: "Painting",
-        description: "Full body painting",
-        estimatedCost: 20000,
-        status: "Completed"
-      }
-    ],
-    activityLog: [
-      {
-        id: "a4",
-        action: "Job completed and vehicle delivered",
-        timestamp: new Date("2025-12-09T17:00:00"),
-        user: "Amit Singh"
-      }
-    ],
-    createdAt: new Date("2025-12-05"),
-    updatedAt: new Date("2025-12-09")
-  },
-  // Adding 47 more jobs to total 50
-  {
-    id: "4",
-    jobCardNumber: "BS-2025-004",
-    regNo: "DL3CAB1234",
-    model: "Tata Nexon XZ+",
-    color: "Flame Red",
-    fuelType: "Petrol",
-    year: "2022",
-    kmsDriven: "18,500",
-    customerName: "Neha Reddy",
-    customerMobile: "+91 9876543213",
-    jobType: "Cash",
-    advisor: "Vijay Patel",
-    technician: "Mohan Singh",
-    estimatedCompletion: new Date("2025-12-11"),
-    arrivalDate: new Date("2025-12-09"),
-    status: "In-Progress",
-    currentStage: "Painting",
-    completedStages: ["Job Created", "Estimate Prepared", "Estimate Approved", "Parts Ordered", "Work in Progress"],
-    photos: [],
-    notes: [],
-    callLogs: [],
-    services: [{id: "s4", name: "Detailing", description: "Full car detailing", estimatedCost: 8000, status: "In Progress"}],
-    activityLog: [{id: "a5", action: "Job created", timestamp: new Date("2025-12-09"), user: "System"}],
-    createdAt: new Date("2025-12-09"),
-    updatedAt: new Date("2025-12-09")
-  },
-  {
-    id: "5",
-    jobCardNumber: "BS-2025-005",
-    regNo: "DL7BPQ7890",
-    model: "Toyota Fortuner",
-    color: "Super White",
-    fuelType: "Diesel",
-    year: "2021",
-    kmsDriven: "42,300",
-    customerName: "Vikram Singh",
-    customerMobile: "+91 9876543214",
-    jobType: "Insurance",
-    advisor: "Amit Singh",
-    technician: "Suresh Yadav",
-    estimatedCompletion: new Date("2025-12-16"),
-    arrivalDate: new Date("2025-12-05"),
-    insuranceCompany: "ICICI Lombard",
-    claimNumber: "CLM2025005678",
-    surveyorName: "Ajay Kumar",
-    approvedAmount: 55000,
-    status: "Completed",
-    currentStage: "Completed",
-    completedStages: ["Job Created", "Estimate Prepared", "Estimate Sent", "Estimate Approved", "Parts Ordered", "Work in Progress", "Painting", "Quality Check", "Ready for Delivery", "Completed"],
-    photos: [],
-    notes: [],
-    callLogs: [],
-    services: [{id: "s5", name: "Full Body Paint", description: "Complete repainting", estimatedCost: 55000, status: "Completed"}],
-    activityLog: [{id: "a6", action: "Job completed", timestamp: new Date("2025-12-09"), user: "Amit Singh"}],
-    createdAt: new Date("2025-12-05"),
-    updatedAt: new Date("2025-12-09")
-  },
-  {
-    id: "6",
-    jobCardNumber: "BS-2025-006",
-    regNo: "MH12GH4567",
-    model: "Mahindra XUV700 AX7",
-    color: "Dazzling Silver",
-    fuelType: "Diesel",
-    year: "2023",
-    kmsDriven: "12,000",
-    customerName: "Sunita Kapoor",
-    customerMobile: "+91 9876543215",
-    jobType: "Cash",
-    advisor: "Rajesh Kumar",
-    estimatedCompletion: new Date("2025-12-12"),
-    arrivalDate: new Date("2025-12-08"),
-    status: "In-Progress",
-    currentStage: "Work in Progress",
-    completedStages: ["Job Created", "Estimate Prepared", "Estimate Approved"],
-    photos: [],
-    notes: [],
-    callLogs: [],
-    services: [{id: "s6", name: "Engine Check", description: "Full engine diagnostics", estimatedCost: 18000, status: "In Progress"}],
-    activityLog: [{id: "a7", action: "Job created", timestamp: new Date("2025-12-08"), user: "System"}],
-    createdAt: new Date("2025-12-08"),
-    updatedAt: new Date("2025-12-08")
-  },
-  {
-    id: "7",
-    jobCardNumber: "BS-2025-007",
-    regNo: "KA03MN8901",
-    model: "Kia Seltos HTX",
-    color: "Glacier White Pearl",
-    fuelType: "Petrol",
-    year: "2022",
-    kmsDriven: "25,600",
-    customerName: "Rahul Verma",
-    customerMobile: "+91 9876543216",
-    jobType: "Insurance",
-    advisor: "Priya Singh",
-    estimatedCompletion: new Date("2025-12-14"),
-    arrivalDate: new Date("2025-12-09"),
-    insuranceCompany: "Bajaj Allianz",
-    claimNumber: "CLM2025007890",
-    status: "Service",
-    currentStage: "Estimate Prepared",
-    completedStages: ["Job Created"],
-    photos: [],
-    notes: [],
-    callLogs: [],
-    services: [{id: "s7", name: "Accident Repair", description: "Front panel repair", estimatedCost: 32000, status: "Pending"}],
-    activityLog: [{id: "a8", action: "Job created", timestamp: new Date("2025-12-09"), user: "System"}],
-    createdAt: new Date("2025-12-09"),
-    updatedAt: new Date("2025-12-09")
-  },
-  {
-    id: "8",
-    jobCardNumber: "BS-2025-008",
-    regNo: "RJ14ST2345",
-    model: "Maruti Suzuki Baleno Delta",
-    color: "Nexa Blue",
-    fuelType: "Petrol",
-    year: "2021",
-    kmsDriven: "35,200",
-    customerName: "Pooja Gupta",
-    customerMobile: "+91 9876543217",
-    jobType: "Cash",
-    advisor: "Vijay Patel",
-    estimatedCompletion: new Date("2025-12-10"),
-    arrivalDate: new Date("2025-12-06"),
-    status: "Completed",
-    currentStage: "Completed",
-    completedStages: ["Job Created", "Estimate Prepared", "Estimate Approved", "Work in Progress", "Quality Check", "Ready for Delivery", "Completed"],
-    photos: [],
-    notes: [],
-    callLogs: [],
-    services: [{id: "s8", name: "Interior Cleaning", description: "Deep cleaning", estimatedCost: 6000, status: "Completed"}],
-    activityLog: [{id: "a9", action: "Job completed", timestamp: new Date("2025-12-08"), user: "Vijay Patel"}],
-    createdAt: new Date("2025-12-06"),
-    updatedAt: new Date("2025-12-08")
-  },
-  {
-    id: "9",
-    jobCardNumber: "BS-2025-009",
-    regNo: "GJ01UV6789",
-    model: "Honda Amaze V",
-    color: "Golden Brown Metallic",
-    fuelType: "Diesel",
-    year: "2020",
-    kmsDriven: "55,800",
-    customerName: "Sandeep Joshi",
-    customerMobile: "+91 9876543218",
-    jobType: "Warranty",
-    advisor: "Rajesh Kumar",
-    estimatedCompletion: new Date("2025-12-11"),
-    arrivalDate: new Date("2025-12-09"),
-    status: "In-Progress",
-    currentStage: "Work in Progress",
-    completedStages: ["Job Created", "Estimate Prepared"],
-    photos: [],
-    notes: [],
-    callLogs: [],
-    services: [{id: "s9", name: "AC Service", description: "AC repair and gas refill", estimatedCost: 12000, status: "In Progress"}],
-    activityLog: [{id: "a10", action: "Job created", timestamp: new Date("2025-12-09"), user: "System"}],
-    createdAt: new Date("2025-12-09"),
-    updatedAt: new Date("2025-12-09")
-  },
-  {
-    id: "10",
-    jobCardNumber: "BS-2025-010",
-    regNo: "TN09WX0123",
-    model: "Hyundai Venue SX",
-    color: "Phantom Black",
-    fuelType: "Petrol",
-    year: "2023",
-    kmsDriven: "9,500",
-    customerName: "Meena Iyer",
-    customerMobile: "+91 9876543219",
-    jobType: "Cash",
-    advisor: "Amit Singh",
-    estimatedCompletion: new Date("2025-12-13"),
-    arrivalDate: new Date("2025-12-09"),
-    status: "Service",
-    currentStage: "Estimate Sent",
-    completedStages: ["Job Created", "Estimate Prepared"],
-    photos: [],
-    notes: [],
-    callLogs: [],
-    services: [{id: "s10", name: "Scratch Repair", description: "Door panel scratch removal", estimatedCost: 28000, status: "Pending"}],
-    activityLog: [{id: "a11", action: "Job created", timestamp: new Date("2025-12-09"), user: "System"}],
-    createdAt: new Date("2025-12-09"),
-    updatedAt: new Date("2025-12-09")
-  }
-];
+// No in-file mock data. Load jobs from Supabase on mount. If Supabase isn't available or empty,
+// the app will start with an empty list and components can handle that gracefully.
 
 export function BodyshopDataProvider({ children }: { children: ReactNode }) {
-  const [jobs, setJobs] = useState<Job[]>(mockJobs);
+  const [jobs, setJobs] = useState<Job[]>([]);
+
+  // Helper to convert Date objects to ISO strings so Supabase receives stable values.
+  const serialize = (obj: any) =>
+    JSON.parse(
+      JSON.stringify(obj, (_key, value) => {
+        if (value instanceof Date) return value.toISOString();
+        return value;
+      })
+    );
+
+  // Revive ISO date strings into Date objects for known date fields (recursively)
+  const reviveDates = (v: any): any => {
+    if (v === null || v === undefined) return v;
+    if (typeof v === "string") {
+      // ISO datetime or date detection
+      const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+      if (isoRegex.test(v)) return new Date(v);
+      const dateOnlyRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (dateOnlyRegex.test(v)) return new Date(v);
+      return v;
+    }
+    if (Array.isArray(v)) return v.map(reviveDates);
+    if (typeof v === "object") {
+      const out: any = {};
+      for (const k of Object.keys(v)) {
+        out[k] = reviveDates(v[k]);
+      }
+      return out;
+    }
+    return v;
+  };
+
+  const parseJobRow = (row: any): Job => {
+    // If the row stores full job in a `payload` column, use it; otherwise use the row directly.
+    const raw = row?.payload ?? row;
+    const revived = reviveDates(raw) as Job;
+    // Derive numeric billing fields and profit if possible - use flexible keys from CSV by indexing as any
+    const r: any = revived as any;
+    // normalize status strings to canonical JobStatus values
+    if (r.status) {
+      const s = String(r.status).toLowerCase();
+      if (s.includes('completed')) r.status = 'Completed';
+      else if (s.includes('in-progress') || s.includes('in progress')) r.status = 'In-Progress';
+      else r.status = 'Service';
+    } else {
+      r.status = 'Service';
+    }
+    // provide compatibility aliases used in some components
+    r.vehicleModel = r.vehicleModel ?? r.model ?? '';
+    r.vehicleRegNo = r.vehicleRegNo ?? r.regNo ?? '';
+    const labour = Number(r.labourAmt ?? r.labour_amt ?? r["labour amount"] ?? 0) || 0;
+    const part = Number(r.partAmt ?? r.part_amt ?? r["part amount"] ?? 0) || 0;
+    const bill = Number(r.billAmount ?? r.bill_amount ?? r["bill amount"] ?? 0) || 0;
+    const profit = bill - (labour + part);
+    r.labourAmt = labour;
+    r.partAmt = part;
+    r.billAmount = bill;
+    r.profit = profit;
+    return r as Job;
+  };
+
+  // Helper to compute profit for a job object (mutates job)
+  const computeProfitForJob = (job: any) => {
+    const j: any = job;
+    const labour = Number(j.labourAmt ?? j.labour_amt ?? j["labour amount"] ?? 0) || 0;
+    const part = Number(j.partAmt ?? j.part_amt ?? j["part amount"] ?? 0) || 0;
+    const bill = Number(j.billAmount ?? j.bill_amount ?? j["bill amount"] ?? 0) || 0;
+    j.labourAmt = labour;
+    j.partAmt = part;
+    j.billAmount = bill;
+    j.profit = bill - (labour + part);
+    return j;
+  };
+
+  useEffect(() => {
+    const loadJobs = async () => {
+      try {
+        const { data, error } = await supabase.from("jobs").select("*");
+        if (error) {
+          console.error("Failed to fetch jobs from Supabase:", error);
+          return;
+        }
+        if (!data) {
+          setJobs([]);
+          return;
+        }
+        // Map rows to Job objects, handling `payload` if present and converting dates
+        const parsed: Job[] = data.map(parseJobRow);
+        setJobs(parsed);
+      } catch (err) {
+        console.error("Supabase loadJobs error:", err);
+      }
+    };
+
+    loadJobs();
+  }, []);
 
   const addJob = (job: Omit<Job, "id" | "createdAt" | "updatedAt" | "activityLog" | "completedStages" | "currentStage">) => {
     const jobNumber = `BS-2025-${String(jobs.length + 1).padStart(3, '0')}`;
@@ -544,6 +257,28 @@ export function BodyshopDataProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date(),
     };
     setJobs((prev) => [newJob, ...prev]);
+
+    // Persist to server via secure API (adds server-side verification & profit computation)
+    (async () => {
+      try {
+        computeProfitForJob(newJob);
+        const payload = serialize(newJob);
+        // get session to forward Authorization
+        const sess = await supabase.auth.getSession();
+        const token = (sess as any)?.data?.session?.access_token || (sess as any)?.access_token || null;
+        await fetch('/api/jobs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ job: payload })
+        });
+      } catch (err) {
+        console.error("Persist new job error:", err);
+        toast.error("Failed to save job to server. It will be retried later.");
+      }
+    })();
   };
 
   const updateJob = (id: string, updates: Partial<Job>) => {
@@ -554,6 +289,27 @@ export function BodyshopDataProvider({ children }: { children: ReactNode }) {
           : job
       )
     );
+
+    // Persist updates via secure server API
+    (async () => {
+      try {
+        const up = computeProfitForJob({ id, ...updates, updatedAt: new Date() });
+        const payload = serialize(up);
+        const sess = await supabase.auth.getSession();
+        const token = (sess as any)?.data?.session?.access_token || (sess as any)?.access_token || null;
+        await fetch('/api/jobs', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ id, updates: payload })
+        });
+      } catch (err) {
+        console.error("Persist update job error:", err);
+        toast.error("Failed to update job on server.");
+      }
+    })();
   };
 
   const updateJobStatus = (id: string, status: JobStatus) => {
@@ -597,6 +353,33 @@ export function BodyshopDataProvider({ children }: { children: ReactNode }) {
           : job
       )
     );
+
+    // Persist photos array in background by upserting the whole job object
+    (async () => {
+      try {
+        const job = jobs.find((j) => j.id === jobId);
+        if (!job) return;
+        const updatedJob = {
+          ...job,
+          photos: [...job.photos, { ...photo, id: Date.now().toString(), uploadedAt: new Date() }],
+          updatedAt: new Date()
+        };
+        computeProfitForJob(updatedJob);
+        const payload = serialize(updatedJob);
+        const sess = await supabase.auth.getSession();
+        const token = (sess as any)?.data?.session?.access_token || (sess as any)?.access_token || null;
+        await fetch('/api/jobs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ job: payload })
+        });
+      } catch (err) {
+        console.error("Supabase addPhoto error:", err);
+      }
+    })();
   };
 
   const addNote = (jobId: string, text: string, user: string) => {
@@ -611,6 +394,32 @@ export function BodyshopDataProvider({ children }: { children: ReactNode }) {
           : job
       )
     );
+
+    (async () => {
+      try {
+        const job = jobs.find((j) => j.id === jobId);
+        if (!job) return;
+        const updatedJob = {
+          ...job,
+          notes: [...job.notes, { id: Date.now().toString(), text, createdAt: new Date(), createdBy: user }],
+          updatedAt: new Date()
+        };
+        computeProfitForJob(updatedJob);
+        const payload = serialize(updatedJob);
+        const sess = await supabase.auth.getSession();
+        const token = (sess as any)?.data?.session?.access_token || (sess as any)?.access_token || null;
+        await fetch('/api/jobs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ job: payload })
+        });
+      } catch (err) {
+        console.error("Supabase addNote error:", err);
+      }
+    })();
   };
 
   const addCallLog = (jobId: string, callLog: Omit<CallLog, "id">) => {
@@ -625,6 +434,32 @@ export function BodyshopDataProvider({ children }: { children: ReactNode }) {
           : job
       )
     );
+
+    (async () => {
+      try {
+        const job = jobs.find((j) => j.id === jobId);
+        if (!job) return;
+        const updatedJob = {
+          ...job,
+          callLogs: [...job.callLogs, { ...callLog, id: Date.now().toString() }],
+          updatedAt: new Date()
+        };
+        computeProfitForJob(updatedJob);
+        const payload = serialize(updatedJob);
+        const sess = await supabase.auth.getSession();
+        const token = (sess as any)?.data?.session?.access_token || (sess as any)?.access_token || null;
+        await fetch('/api/jobs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ job: payload })
+        });
+      } catch (err) {
+        console.error("Supabase addCallLog error:", err);
+      }
+    })();
   };
 
   const addService = (jobId: string, service: Omit<Service, "id">) => {
@@ -639,6 +474,32 @@ export function BodyshopDataProvider({ children }: { children: ReactNode }) {
           : job
       )
     );
+
+    (async () => {
+      try {
+        const job = jobs.find((j) => j.id === jobId);
+        if (!job) return;
+        const updatedJob = {
+          ...job,
+          services: [...job.services, { ...service, id: Date.now().toString() }],
+          updatedAt: new Date()
+        };
+        computeProfitForJob(updatedJob);
+        const payload = serialize(updatedJob);
+        const sess = await supabase.auth.getSession();
+        const token = (sess as any)?.data?.session?.access_token || (sess as any)?.access_token || null;
+        await fetch('/api/jobs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ job: payload })
+        });
+      } catch (err) {
+        console.error("Supabase addService error:", err);
+      }
+    })();
   };
 
   const addActivity = (jobId: string, action: string, user: string) => {
@@ -653,6 +514,31 @@ export function BodyshopDataProvider({ children }: { children: ReactNode }) {
           : job
       )
     );
+
+    (async () => {
+      try {
+        const job = jobs.find((j) => j.id === jobId);
+        if (!job) return;
+        const updatedJob = {
+          ...job,
+          activityLog: [...job.activityLog, { id: Date.now().toString(), action, timestamp: new Date(), user }],
+          updatedAt: new Date()
+        };
+        const payload = serialize(updatedJob);
+        const sess = await supabase.auth.getSession();
+        const token = (sess as any)?.data?.session?.access_token || (sess as any)?.access_token || null;
+        await fetch('/api/jobs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ job: payload })
+        });
+      } catch (err) {
+        console.error("Supabase addActivity error:", err);
+      }
+    })();
   };
 
   const getJobsByStatus = (status: JobStatus) => {

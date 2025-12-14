@@ -24,7 +24,6 @@ export function Followups() {
   const [callJobId, setCallJobId] = useState<string>("");
 
   // Call log form state
-  const [callDuration, setCallDuration] = useState("");
   const [remarks, setRemarks] = useState("");
   const [nextFollowUp, setNextFollowUp] = useState<Date | undefined>(undefined);
   const [customerResponse, setCustomerResponse] = useState("");
@@ -48,14 +47,13 @@ export function Followups() {
   };
 
   const handleSubmitCallLog = () => {
-    if (!callDuration || !remarks || !customerResponse) {
+    if (!remarks || !customerResponse) {
       toast.error("Please fill all required fields");
       return;
     }
 
     addCallLog(callJobId, {
       callDate: new Date(),
-      callDuration,
       remarks,
       nextFollowUp,
       calledBy: "Current User",
@@ -70,7 +68,6 @@ export function Followups() {
   };
 
   const resetCallForm = () => {
-    setCallDuration("");
     setRemarks("");
     setNextFollowUp(undefined);
     setCustomerResponse("");
@@ -196,9 +193,6 @@ export function Followups() {
                       </div>
                       <p className="text-sm text-gray-700 mb-2">{lastCall.remarks}</p>
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-600">
-                          Duration: {lastCall.callDuration}
-                        </span>
                         <Badge 
                           variant="outline"
                           className={cn(
@@ -279,15 +273,7 @@ export function Followups() {
             <DialogTitle>Log Customer Call</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label>Call Duration *</Label>
-              <Input
-                value={callDuration}
-                onChange={(e) => setCallDuration(e.target.value)}
-                placeholder="e.g., 15 mins"
-                className="mt-1"
-              />
-            </div>
+            {/* Call duration removed per requirements */}
 
             <div>
               <Label>Remarks *</Label>

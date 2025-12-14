@@ -13,7 +13,7 @@ import {
   Image as ImageIcon, FileText, Clock, Shield, X, Upload
 } from "lucide-react";
 import { cn } from "./ui/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner@2.0.3";
 
 interface JobDetailsDialogProps {
@@ -39,6 +39,21 @@ export function JobDetailsDialog({ job, open, onClose }: JobDetailsDialogProps) 
   const { updateJobStage, addNote, addActivity, updateJob } = useBodyshopData();
   const [newNote, setNewNote] = useState("");
   const [interestStatus, setInterestStatus] = useState(job?.interestStatus || "");
+  const [localGroup, setLocalGroup] = useState<string>(job?.groupName ?? "");
+  const [localCallback, setLocalCallback] = useState<Date | undefined>(job?.callbackDate ? new Date(job.callbackDate) : undefined);
+  const [localLabour, setLocalLabour] = useState<string>(job?.labourAmt ? String(job.labourAmt) : "");
+  const [localPart, setLocalPart] = useState<string>(job?.partAmt ? String(job.partAmt) : "");
+  const [localBill, setLocalBill] = useState<string>(job?.billAmount ? String(job.billAmount) : "");
+
+  // Keep local state in sync if job changes
+  useEffect(() => {
+    setLocalGroup(job?.groupName ?? "");
+    setLocalCallback(job?.callbackDate ? new Date(job.callbackDate) : undefined);
+    setLocalLabour(job?.labourAmt ? String(job.labourAmt) : "");
+    setLocalPart(job?.partAmt ? String(job.partAmt) : "");
+    setLocalBill(job?.billAmount ? String(job.billAmount) : "");
+    setInterestStatus(job?.interestStatus ?? "");
+  }, [job]);
 
   if (!job) return null;
 
@@ -82,6 +97,19 @@ export function JobDetailsDialog({ job, open, onClose }: JobDetailsDialogProps) 
     });
   };
 
+  const handleSaveMeta = () => {
+    const updates: any = {
+      groupName: localGroup || null,
+      callbackDate: localCallback ? localCallback.toISOString() : null,
+      labourAmt: localLabour ? Number(localLabour) : undefined,
+      partAmt: localPart ? Number(localPart) : undefined,
+      billAmount: localBill ? Number(localBill) : undefined,
+    };
+    updateJob(job.id, updates);
+    addActivity(job.id, 'Updated job meta (group/callback/billing)', 'Current User');
+    toast.success('Job metadata updated');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] p-0">
@@ -106,6 +134,9 @@ export function JobDetailsDialog({ job, open, onClose }: JobDetailsDialogProps) 
                   INSURANCE
                 </Badge>
               )}
+              <Button size="sm" variant="outline" onClick={handleSaveMeta}>
+                Save Changes
+              </Button>
             </div>
           </div>
         </DialogHeader>
@@ -201,6 +232,34 @@ export function JobDetailsDialog({ job, open, onClose }: JobDetailsDialogProps) 
                 <div>
                   <Label className="text-gray-500">Arrival Date</Label>
                   <p className="text-gray-900 mt-1">{formatDate(job.arrivalDate)}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Group Name</Label>
+                  <Input value={localGroup} onChange={(e) => setLocalGroup(e.target.value)} className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-gray-500">Callback Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full mt-1 justify-start text-left font-normal",
+                          !localCallback && "text-gray-500"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {localCallback ? formatDate(localCallback) : 'Select date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={localCallback}
+                        onSelect={(d: any) => d && setLocalCallback(d)}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </section>
@@ -306,6 +365,28 @@ export function JobDetailsDialog({ job, open, onClose }: JobDetailsDialogProps) 
                   <p className="text-sm text-gray-500">No services added yet</p>
                 </div>
               )}
+
+              {/* Billing overview and editable fields */}
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <h4 className="text-sm font-semibold mb-2">Billing & Profit</h4>
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <Label>Labour Amount</Label>
+                    <Input value={localLabour} onChange={(e) => setLocalLabour(e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Parts Amount</Label>
+                    <Input value={localPart} onChange={(e) => setLocalPart(e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Bill Amount</Label>
+                    <Input value={localBill} onChange={(e) => setLocalBill(e.target.value)} className="mt-1" />
+                  </div>
+                </div>
+                <div className="mt-3 text-sm">
+                  <div>Total Profit: <span className="font-semibold">₹{(Number(localBill || 0) - (Number(localLabour || 0) + Number(localPart || 0))).toLocaleString()}</span></div>
+                </div>
+              </div>
             </section>
 
             <Separator />

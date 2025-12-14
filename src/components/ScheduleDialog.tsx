@@ -3,6 +3,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Calendar, Clock, UserCheck, ChevronRight } from "lucide-react";
 import { toast } from "sonner@2.0.3";
+import { useBodyshopData } from "./BodyshopDataContext";
 
 interface ScheduleDialogProps {
   open: boolean;
@@ -10,81 +11,34 @@ interface ScheduleDialogProps {
 }
 
 export function ScheduleDialog({ open, onOpenChange }: ScheduleDialogProps) {
-  const todaySchedule = [
-    { 
-      time: "09:00 AM", 
-      endTime: "11:00 AM",
-      task: "Honda City - Paint Job", 
-      technician: "Amit Sharma", 
-      status: "in-progress",
-      customer: "Mr. Patel",
-      bay: "Bay 2"
-    },
-    { 
-      time: "10:30 AM", 
-      endTime: "12:30 PM",
-      task: "Maruti Swift - Dent Repair", 
-      technician: "Rajesh Kumar", 
-      status: "completed",
-      customer: "Mrs. Sharma",
-      bay: "Bay 1"
-    },
-    { 
-      time: "12:00 PM", 
-      endTime: "03:00 PM",
-      task: "Hyundai Creta - Full Service", 
-      technician: "Vijay Patel", 
-      status: "pending",
-      customer: "Mr. Singh",
-      bay: "Bay 3"
-    },
-    { 
-      time: "02:00 PM", 
-      endTime: "04:30 PM",
-      task: "Tata Nexon - Insurance Claim", 
-      technician: "Priya Singh", 
-      status: "in-progress",
-      customer: "Ms. Reddy",
-      bay: "Reception"
-    },
-    { 
-      time: "04:00 PM", 
-      endTime: "06:00 PM",
-      task: "Toyota Fortuner - Detailing", 
-      technician: "Rajesh Kumar", 
-      status: "scheduled",
-      customer: "Mr. Verma",
-      bay: "Bay 1"
-    },
-    { 
-      time: "04:30 PM", 
-      endTime: "06:30 PM",
-      task: "Mahindra XUV700 - Wheel Alignment", 
-      technician: "Vijay Patel", 
-      status: "scheduled",
-      customer: "Mr. Kumar",
-      bay: "Bay 3"
-    },
-  ];
+  const { jobs } = useBodyshopData();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todaySchedule = jobs.filter(j => {
+    const d = j.arrivalDate ? new Date(j.arrivalDate) : j.createdAt ? new Date(j.createdAt) : null;
+    if (!d) return false;
+    d.setHours(0,0,0,0);
+    return d.getTime() === today.getTime();
+  }).map(j => ({
+    time: j.arrivalDate ? new Date(j.arrivalDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
+    endTime: '-',
+    task: `${j.model ?? ''} - ${j.jobCardNumber}`,
+    technician: j.technician ?? 'Unassigned',
+    status: j.status,
+    customer: j.customerName ?? '-',
+    bay: j.pickupLocation ?? '-'
+  }));
 
   const upcomingDays = [
-    { date: "Tomorrow", count: 12, slots: "6 available" },
-    { date: "Day After", count: 8, slots: "10 available" },
-    { date: "This Week", count: 45, slots: "32 available" },
+    { date: "Tomorrow", count: jobs.length, slots: "auto" },
+    { date: "This Week", count: jobs.length, slots: "auto" },
   ];
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-100 text-green-700";
-      case "in-progress":
-        return "bg-blue-100 text-blue-700";
-      case "pending":
-      case "scheduled":
-        return "bg-orange-100 text-orange-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
+    const s = String(status || '').toLowerCase();
+    if (s === 'completed') return 'bg-green-100 text-green-700';
+    if (s === 'in-progress' || s === 'in progress') return 'bg-blue-100 text-blue-700';
+    if (s === 'pending' || s === 'scheduled') return 'bg-orange-100 text-orange-700';
+    return 'bg-gray-100 text-gray-700';
   };
 
   const handleViewDetails = (task: string) => {
@@ -92,9 +46,9 @@ export function ScheduleDialog({ open, onOpenChange }: ScheduleDialogProps) {
   };
 
   const statsData = [
-    { label: "Today's Jobs", value: todaySchedule.length, color: "blue" },
-    { label: "In Progress", value: todaySchedule.filter(s => s.status === "in-progress").length, color: "purple" },
-    { label: "Completed", value: todaySchedule.filter(s => s.status === "completed").length, color: "green" },
+  { label: "Today's Jobs", value: todaySchedule.length, color: "blue" },
+  { label: "In Progress", value: todaySchedule.filter(s => String(s.status || '').toLowerCase() === 'in-progress' || String(s.status || '').toLowerCase() === 'in progress').length, color: "purple" },
+  { label: "Completed", value: todaySchedule.filter(s => String(s.status || '').toLowerCase() === 'completed').length, color: "green" },
   ];
 
   return (

@@ -22,6 +22,7 @@ import { ExportReportDialog } from "./ExportReportDialog";
 import { TeamViewDialog } from "./TeamViewDialog";
 import { RevenueDialog } from "./RevenueDialog";
 import { AIRADialog } from "./AIRADialog";
+import { useBodyshopData } from "./BodyshopDataContext";
 
 export function ManagerDashboard() {
   const [showExportReport, setShowExportReport] = useState(false);
@@ -29,66 +30,55 @@ export function ManagerDashboard() {
   const [showRevenue, setShowRevenue] = useState(false);
   const [showAIRA, setShowAIRA] = useState(false);
 
-  // Key Metrics
+  const { jobs } = useBodyshopData();
+
+  // Key Metrics (computed)
+  const totalRevenue = jobs.reduce((s, j) => s + (Number(j.billAmount ?? j.services?.reduce((ss: any, it: any) => ss + (it?.estimatedCost ?? 0), 0) ?? 0) || 0), 0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todaysRevenue = jobs.filter(j => { const d = j.createdAt ? new Date(j.createdAt) : null; if (!d) return false; d.setHours(0,0,0,0); return d.getTime() === today.getTime(); }).reduce((s,j) => s + (Number(j.billAmount ?? 0) || 0), 0);
+  const activeJobs = jobs.filter(j => j.status !== 'Completed').length;
+  const completedToday = jobs.filter(j => { const d = j.createdAt ? new Date(j.createdAt) : null; if (!d) return false; d.setHours(0,0,0,0); return d.getTime() === today.getTime() && j.status === 'Completed'; }).length;
+  const teamCount = Array.from(new Set(jobs.map(j => j.technician).filter(Boolean))).length;
+
   const metrics = [
-    { 
-      label: "Today's Revenue", 
-      value: "₹45,230", 
-      change: "+12%", 
-      trend: "up",
-      icon: DollarSign,
-      color: "green"
-    },
-    { 
-      label: "Active Jobs", 
-      value: "28", 
-      change: "+5", 
-      trend: "up",
-      icon: Wrench,
-      color: "blue"
-    },
-    { 
-      label: "Team Members", 
-      value: "12", 
-      change: "2 on leave", 
-      trend: "neutral",
-      icon: Users,
-      color: "purple"
-    },
-    { 
-      label: "Completed Today", 
-      value: "8", 
-      change: "+2 from yesterday", 
-      trend: "up",
-      icon: CheckCircle,
-      color: "teal"
-    },
+    { label: "Today's Revenue", value: `₹${todaysRevenue.toLocaleString()}`, change: '', trend: "up", icon: DollarSign, color: "green" },
+    { label: "Active Jobs", value: String(activeJobs), change: '', trend: "up", icon: Wrench, color: "blue" },
+    { label: "Team Members", value: String(teamCount), change: '', trend: "neutral", icon: Users, color: "purple" },
+    { label: "Completed Today", value: String(completedToday), change: '', trend: "up", icon: CheckCircle, color: "teal" },
   ];
 
-  // Team Performance
-  const teamMembers = [
-    { name: "Rajesh Kumar", role: "Senior Technician", jobs: 8, rating: 4.8, status: "active" },
-    { name: "Amit Sharma", role: "Paint Specialist", jobs: 6, rating: 4.9, status: "active" },
-    { name: "Priya Singh", role: "Service Advisor", jobs: 12, rating: 4.7, status: "active" },
-    { name: "Vijay Patel", role: "Technician", jobs: 5, rating: 4.6, status: "on-break" },
-    { name: "Suresh Reddy", role: "Parts Manager", jobs: 4, rating: 4.8, status: "active" },
-  ];
+  // Team Performance derived from jobs
+  const techMap: Record<string, { jobs: number }> = {};
+  jobs.forEach(j => {
+    const t = j.technician || 'Unassigned';
+    if (!techMap[t]) techMap[t] = { jobs: 0 };
+    techMap[t].jobs += 1;
+  });
+  const teamMembers = Object.keys(techMap).map(name => ({ name, role: 'Technician', jobs: techMap[name].jobs, rating: 4.5, status: 'active' }));
 
-  // Today's Schedule
-  const schedule = [
-    { time: "09:00 AM", task: "Honda City - Paint Job", technician: "Amit Sharma", status: "in-progress" },
-    { time: "10:30 AM", task: "Maruti Swift - Dent Repair", technician: "Rajesh Kumar", status: "completed" },
-    { time: "12:00 PM", task: "Hyundai Creta - Full Service", technician: "Vijay Patel", status: "pending" },
-    { time: "02:00 PM", task: "Tata Nexon - Insurance Claim", technician: "Priya Singh", status: "in-progress" },
-    { time: "04:00 PM", task: "Toyota Fortuner - Detailing", technician: "Rajesh Kumar", status: "scheduled" },
-  ];
+  // Today's Schedule - jobs arriving today
+  const schedule = jobs.filter(j => {
+    const d = j.arrivalDate ? new Date(j.arrivalDate) : j.createdAt ? new Date(j.createdAt) : null;
+    if (!d) return false;
+    d.setHours(0,0,0,0);
+    return d.getTime() === today.getTime();
+  }).slice(0,6).map(j => ({ time: j.arrivalDate ? new Date(j.arrivalDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-', task: `${j.model ?? ''} - ${j.jobCardNumber}`, technician: j.technician ?? 'Unassigned', status: j.status }));
 
-  // Revenue Overview
+  // Revenue Overview (computed)
+  const startOf = (d: Date) => { const r = new Date(d); r.setHours(0,0,0,0); return r; };
+  const todayDate = startOf(new Date());
+  const tomorrow = new Date(todayDate.getTime() + 24*60*60*1000);
+  const startOfWeek = startOf(new Date()); startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+  const startOfMonth = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
+
+  const revenueForRange = (from: Date, to: Date) => jobs.filter((j:any) => { const d = j.createdAt ? new Date(j.createdAt) : null; if (!d) return false; return d >= from && d < to; }).reduce((s:number, j:any) => s + (Number(j.billAmount ?? j.services?.reduce((ss:any,it:any)=> ss + (it?.estimatedCost ?? 0),0) ?? 0) || 0), 0);
+  const countForRange = (from: Date, to: Date) => jobs.filter((j:any) => { const d = j.createdAt ? new Date(j.createdAt) : null; if (!d) return false; return d >= from && d < to; }).length;
+
   const revenueData = [
-    { period: "Today", amount: "₹45,230", jobs: 8 },
-    { period: "This Week", amount: "₹2,14,500", jobs: 42 },
-    { period: "This Month", amount: "₹8,95,000", jobs: 156 },
-    { period: "This Year", amount: "₹1,02,45,000", jobs: 1842 },
+    { period: "Today", amount: `₹${revenueForRange(todayDate, tomorrow).toLocaleString()}`, jobs: countForRange(todayDate, tomorrow) },
+    { period: "This Week", amount: `₹${revenueForRange(startOfWeek, new Date(startOfWeek.getTime() + 7*24*60*60*1000)).toLocaleString()}`, jobs: countForRange(startOfWeek, new Date(startOfWeek.getTime() + 7*24*60*60*1000)) },
+    { period: "This Month", amount: `₹${revenueForRange(startOfMonth, new Date(startOfMonth.getFullYear(), startOfMonth.getMonth()+1,1)).toLocaleString()}`, jobs: countForRange(startOfMonth, new Date(startOfMonth.getFullYear(), startOfMonth.getMonth()+1,1)) },
+    { period: "This Year", amount: `₹${revenueForRange(new Date(todayDate.getFullYear(),0,1), new Date(todayDate.getFullYear()+1,0,1)).toLocaleString()}`, jobs: countForRange(new Date(todayDate.getFullYear(),0,1), new Date(todayDate.getFullYear()+1,0,1)) },
   ];
 
   const getStatusColor = (status: string) => {
