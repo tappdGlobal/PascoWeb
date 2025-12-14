@@ -53,7 +53,13 @@ ALTER TABLE IF EXISTS jobs
   ADD COLUMN IF NOT EXISTS advisor text;
 
 -- Optional: ensure queries by callback_date are efficient
-CREATE INDEX IF NOT EXISTS jobs_callback_date_idx ON jobs(callback_date);
+-- Create the index only if the `jobs` table exists (some projects may use a different table name)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'jobs') THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS jobs_callback_date_idx ON jobs(callback_date)';
+  END IF;
+END$$;
 
 -- 5) quick_messages: optional templates for SMS/Call dialogs
 CREATE TABLE IF NOT EXISTS quick_messages (
