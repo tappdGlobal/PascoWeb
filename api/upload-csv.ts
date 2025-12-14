@@ -9,25 +9,65 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing Supabase env vars (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
 }
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+// Create a guarded admin client. If env vars are missing or malformed, fall back
+// to a stub that surfaces clear errors instead of throwing at module init time.
+let supabaseAdmin: any;
+function makeAdminStub(reason: string) {
+  console.error("Supabase admin client unavailable:", reason);
+  return {
+    auth: { getUser: async (_: any) => ({ data: null, error: { message: reason } }) },
+    from: (_: string) => ({
+      select: async () => ({ data: null, error: { message: reason } }),
+      insert: async () => ({ data: null, error: { message: reason } }),
+      upsert: async () => ({ data: null, error: { message: reason } }),
+      update: async () => ({ data: null, error: { message: reason } }),
+      delete: async () => ({ data: null, error: { message: reason } }),
+    }),
+    rpc: async () => ({ data: null, error: { message: reason } }),
+  };
+}
+
+try {
+  // validate URL format early
+  new URL(SUPABASE_URL);
+  supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+} catch (err: any) {
+  supabaseAdmin = makeAdminStub(String(err?.message || err || 'Invalid SUPABASE_URL or missing SERVICE_ROLE_KEY'));
+}
 
 // Helper to verify a user by access token passed in Authorization header
 async function verifyUserFromAuthHeader(req: any) {
   const auth = req.headers.authorization || req.headers.Authorization;
-  if (!auth || typeof auth !== 'string') return null;
+  if (!auth || typeof auth !== 'string') {
+    console.warn('verifyUserFromAuthHeader: missing Authorization header');
+    return null;
+  }
   const parts = auth.split(' ');
   if (parts.length !== 2) return null;
   const token = parts[1];
   try {
     const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !data) return null;
+    if (error) {
+      console.error('verifyUserFromAuthHeader: supabase getUser returned error', error);
+      return null;
+    }
+    if (!data) {
+      console.warn('verifyUserFromAuthHeader: supabase getUser returned no data');
+      return null;
+    }
     return data.user;
   } catch (err) {
+    console.error('verifyUserFromAuthHeader: unexpected error', err);
     return null;
   }
 }
 
 export default async function handler(req: any, res: any) {
+  try {
+    console.log('api/upload-csv called', { method: req.method, headers: { authorization: !!(req.headers && (req.headers.authorization || req.headers.Authorization)) }, bodyKeys: req.body ? Object.keys(req.body) : null });
+  } catch (e) {
+    console.warn('failed to log request metadata', e);
+  }
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).end("Method not allowed");
@@ -157,7 +197,20 @@ export default async function handler(req: any, res: any) {
 
     return res.status(200).json({ insertedCount, errors });
   } catch (err: any) {
-    console.error("Upload CSV handler error:", err);
-    return res.status(500).json({ error: err.message || String(err) });
+    // Log stack if available for easier debugging in server logs
+    console.error("Upload CSV handler error:", err && (err.stack || err.message || String(err)));
+    try {
+      return res.status(500).json({ error: err && (err.message || String(err)) });
+    } catch (sendErr) {
+      // If sending JSON fails (platform-level issue), at least log and end
+      console.error('Failed to send error JSON response:', sendErr);
+      try {
+        return res.status(500).end(String(err));
+      } catch (endErr) {
+        console.error('Failed to end response after error:', endErr);
+        // last resort: throw so the platform captures the crash in its logs
+        throw err;
+      }
+    }
   }
 }

@@ -7,7 +7,28 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing Supabase env vars for mapping_presets API");
 }
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+let supabaseAdmin: any;
+function makeAdminStub(reason: string) {
+  console.error("Supabase admin client unavailable:", reason);
+  return {
+    auth: { getUser: async (_: any) => ({ data: null, error: { message: reason } }) },
+    from: (_: string) => ({
+      select: async () => ({ data: null, error: { message: reason } }),
+      insert: async () => ({ data: null, error: { message: reason } }),
+      upsert: async () => ({ data: null, error: { message: reason } }),
+      update: async () => ({ data: null, error: { message: reason } }),
+      delete: async () => ({ data: null, error: { message: reason } }),
+    }),
+    rpc: async () => ({ data: null, error: { message: reason } }),
+  };
+}
+
+try {
+  new URL(SUPABASE_URL);
+  supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+} catch (err: any) {
+  supabaseAdmin = makeAdminStub(String(err?.message || err || 'Invalid SUPABASE_URL or missing SERVICE_ROLE_KEY'));
+}
 
 // Helper to verify a user by access token passed in Authorization header
 async function verifyUserFromAuthHeader(req: any) {

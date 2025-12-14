@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "strict": false,
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["scripts/**/*", "api/**/*", "src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

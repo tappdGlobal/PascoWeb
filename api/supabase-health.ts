@@ -9,7 +9,14 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    let supabaseAdmin: any;
+    try {
+      new URL(SUPABASE_URL);
+      supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    } catch (err: any) {
+      return res.status(500).json({ ok: false, error: 'Invalid SUPABASE_URL or missing SUPABASE_SERVICE_ROLE_KEY', details: String(err?.message || err) });
+    }
+
     // Try a light-weight read from mapping_presets (if present) to validate connectivity
     const { data, error } = await supabaseAdmin.from('mapping_presets').select('id').limit(1);
     if (error) {

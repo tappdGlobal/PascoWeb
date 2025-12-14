@@ -15,6 +15,14 @@ app.post('/api/upload-csv', (req: any, res: any) => {
   return uploadHandler(req, res);
 });
 
+// Root handler to make it obvious the dev API server is running
+app.get('/', (_req: any, res: any) => {
+  res.status(200).json({
+    ok: true,
+    message: 'Dev API server running. Available routes: /api/upload-csv (POST), /api/mapping_presets (GET/POST), /api/jobs (POST/PATCH), /api/supabase-health (GET)'
+  });
+});
+
 app.all('/api/mapping_presets', (req: any, res: any) => {
   return mappingHandler(req, res);
 });

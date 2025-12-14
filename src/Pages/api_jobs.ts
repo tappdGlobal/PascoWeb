@@ -5,7 +5,28 @@ import { toSnakeCaseKeyMap } from "../utils/csvMapping";
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+let supabaseAdmin: any;
+function makeAdminStub(reason: string) {
+  console.error("Supabase admin client unavailable:", reason);
+  return {
+    auth: { getUser: async (_: any) => ({ data: null, error: { message: reason } }) },
+    from: (_: string) => ({
+      select: async () => ({ data: null, error: { message: reason } }),
+      insert: async () => ({ data: null, error: { message: reason } }),
+      upsert: async () => ({ data: null, error: { message: reason } }),
+      update: async () => ({ data: null, error: { message: reason } }),
+      delete: async () => ({ data: null, error: { message: reason } }),
+    }),
+    rpc: async () => ({ data: null, error: { message: reason } }),
+  };
+}
+
+try {
+  new URL(SUPABASE_URL);
+  supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+} catch (err: any) {
+  supabaseAdmin = makeAdminStub(String(err?.message || err || 'Invalid SUPABASE_URL or missing SERVICE_ROLE_KEY'));
+}
 
 async function verifyUserFromAuthHeader(req: any) {
   const auth = req.headers.authorization || req.headers.Authorization;
