@@ -29,6 +29,29 @@
               document.body.appendChild(el);
             });
           }
+          // Attach global error handlers so runtime exceptions are visible even if the React app crashes
+          function formatErrorMessage(e, stack) {
+            return (e && e.message) ? `${e.message}\n\n${stack || ''}` : String(e || 'Unknown error');
+          }
+
+          window.addEventListener('error', function (ev) {
+            try {
+              const msg = formatErrorMessage(ev.error || ev.message, ev.error && ev.error.stack);
+              show('Uncaught error:\n' + msg);
+            } catch (err) {
+              try { show('Uncaught error: ' + String(ev.error || ev.message)); } catch (e) {}
+            }
+          });
+
+          window.addEventListener('unhandledrejection', function (ev) {
+            try {
+              const reason = ev && ev.reason;
+              const msg = formatErrorMessage(reason, reason && reason.stack);
+              show('Unhandled promise rejection:\n' + msg);
+            } catch (err) {
+              try { show('Unhandled promise rejection'); } catch (e) {}
+            }
+          });
 
           // If the script never runs, mount won't happen — show message after 2.5s
           setTimeout(function () {
