@@ -1,0 +1,53 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0). If empty, uses the pushed tag context.'
+        required: false
+      release_name:
+        description: 'Release title (optional)'
+        required: false
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ -n "${{ github.ref_name }}" ]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "No tag specified" >&2
+            exit 1
+          fi
+
+      - name: Read release notes
+        id: notes
+        run: |
+          if [ -f RELEASE_NOTES.md ]; then
+            echo "body<<EOF" >> $GITHUB_OUTPUT
+            cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "body=Automated release from workflow" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          release_name: ${{ github.event.inputs.release_name || steps.tag.outputs.tag }}
+          body: ${{ steps.notes.outputs.body }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
