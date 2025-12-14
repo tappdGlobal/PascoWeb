@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS mapping_presets (
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name text NOT NULL,
   mapping jsonb NOT NULL,
-  created_at timestamptz WITH TIME ZONE DEFAULT now()
+  created_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS mapping_presets_user_id_idx ON mapping_presets(user_id);
 
@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   email text,
   phone text,
   metadata jsonb,
-  created_at timestamptz WITH TIME ZONE DEFAULT now(),
-  updated_at timestamptz WITH TIME ZONE DEFAULT now()
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
 );
 
 -- 3) inventory: optional inventory table used by the UI
@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS inventory (
   category text,
   supplier text,
   metadata jsonb,
-  created_at timestamptz WITH TIME ZONE DEFAULT now(),
-  updated_at timestamptz WITH TIME ZONE DEFAULT now()
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS inventory_name_idx ON inventory(name);
 
@@ -48,7 +48,7 @@ ALTER TABLE IF EXISTS jobs
   ADD COLUMN IF NOT EXISTS bill_amount numeric(12,2),
   ADD COLUMN IF NOT EXISTS profit numeric(12,2),
   ADD COLUMN IF NOT EXISTS group_name text,
-  ADD COLUMN IF NOT EXISTS callback_date timestamptz WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS callback_date timestamptz,
   ADD COLUMN IF NOT EXISTS technician text,
   ADD COLUMN IF NOT EXISTS advisor text;
 
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS quick_messages (
   name text,
   message text NOT NULL,
   created_by uuid REFERENCES auth.users(id),
-  created_at timestamptz WITH TIME ZONE DEFAULT now()
+  created_at timestamptz DEFAULT now()
 );
 
 -- Done. Review these changes before applying in production.
