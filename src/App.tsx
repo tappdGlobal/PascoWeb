@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { MobileHeader } from "./components/MobileHeader";
 import { BodyshopBottomNav } from "./components/BodyshopBottomNav";
 import { BodyshopDashboard } from "./components/BodyshopDashboard";
@@ -15,11 +15,8 @@ import { RevenueDialog } from "./components/RevenueDialog";
 import { Toaster } from "./components/ui/sonner";
 import { BodyshopDataProvider } from "./components/BodyshopDataContext";
 import { Button } from "./components/ui/button";
-import { Plus, Upload } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./components/ui/dialog";
-import CsvUploader from "./components/CsvUploader";
-import Auth from "./components/Auth";
-import supabase from "./supabase/client";
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -27,9 +24,6 @@ function AppContent() {
   const [showExportReport, setShowExportReport] = useState(false);
   const [showTeamView, setShowTeamView] = useState(false);
   const [showRevenue, setShowRevenue] = useState(false);
-
-  // CSV upload dialog visibility
-  const [showCsvUpload, setShowCsvUpload] = useState(false);
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -84,38 +78,29 @@ function AppContent() {
         {renderContent()}
       </main>
 
-      {/* Floating Action Button (New Job) */}
+      {/* Floating Action Button */}
       {(activeTab === "dashboard" || activeTab === "jobs" || activeTab === "analytics") && (
         <Button
           onClick={() => setShowNewJobDialog(true)}
           className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 hover:from-orange-500 hover:to-orange-700 shadow-xl z-40 border-0 transition-all duration-300 hover:scale-110"
           size="icon"
-          aria-label="New Job"
         >
           <Plus className="w-6 h-6 text-white" />
         </Button>
       )}
 
-      {/* CSV Upload quick button (available across the app) */}
-      <Button
-        onClick={() => setShowCsvUpload(true)}
-        className="fixed bottom-40 right-6 w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg z-40 border-0 transition-all duration-200"
-        size="icon"
-        aria-label="Upload CSV"
-        title="Upload CSV"
-      >
-        <Upload className="w-5 h-5 text-white" />
-      </Button>
-
       {/* Floating Quick Menu - Available on all tabs */}
-      <FloatingQuickMenu
+      <FloatingQuickMenu 
         onExportReport={() => setShowExportReport(true)}
         onManagerDetails={() => setShowTeamView(true)}
         onRevenue={() => setShowRevenue(true)}
       />
 
       {/* Bottom Navigation */}
-      <BodyshopBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BodyshopBottomNav 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab}
+      />
 
       {/* New Job Dialog */}
       <Dialog open={showNewJobDialog} onOpenChange={setShowNewJobDialog}>
@@ -125,19 +110,6 @@ function AppContent() {
           </DialogHeader>
           <div className="px-6 pb-6 overflow-y-auto max-h-[calc(90vh-100px)]">
             <NewJobRequest onSuccess={handleJobCreated} />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* CSV Upload Dialog */}
-      <Dialog open={showCsvUpload} onOpenChange={setShowCsvUpload}>
-        <DialogContent className="max-w-3xl max-h-[90vh] p-0">
-          <DialogHeader className="p-6 pb-4 border-b">
-            <DialogTitle>Upload CSV to Supabase</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 pb-6 overflow-y-auto max-h-[calc(90vh-100px)]">
-            {/* CsvUploader is the reusable component that parses, validates and sends CSV rows to your upload API */}
-            <CsvUploader apiPath="/api/upload-csv" />
           </div>
         </DialogContent>
       </Dialog>
@@ -158,43 +130,6 @@ function AppContent() {
 }
 
 export default function App() {
-  const [user, setUser] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        const session = (data as any)?.session;
-        if (mounted) setUser(session?.user ?? null);
-      } catch (err) {
-        console.warn('Error getting session', err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    const { data: listener } = supabase.auth.onAuthStateChange((event: any, session: any) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => {
-      try { listener?.subscription?.unsubscribe?.(); } catch (e) {}
-      mounted = false;
-    };
-  }, []);
-
-  if (loading) return <div className="p-6">Loading...</div>;
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Auth />
-      </div>
-    );
-  }
-
   return (
     <BodyshopDataProvider>
       <AppContent />
