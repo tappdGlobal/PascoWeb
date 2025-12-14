@@ -1,5 +1,17 @@
 {
   "version": 2,
+  "builds": [
+    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
+  ],
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "nodejs18.x",
+      "maxDuration": 10
+    }
+  }
+}
+{
+  "version": 2,
   "outputDirectory": "dist",
   "builds": [
     {
