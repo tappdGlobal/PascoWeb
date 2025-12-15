@@ -228,8 +228,24 @@ export function BodyshopDataProvider({ children }: { children: ReactNode }) {
           setJobs([]);
           return;
         }
+        // Normalize DB snake_case keys to camelCase, then map rows to Job objects
+        const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+        const normalizeKeys = (obj: any): any => {
+          if (obj === null || obj === undefined) return obj;
+          if (Array.isArray(obj)) return obj.map(normalizeKeys);
+          if (typeof obj !== 'object') return obj;
+          const out: any = {};
+          for (const k of Object.keys(obj)) {
+            const v = obj[k];
+            const nk = snakeToCamel(k);
+            out[nk] = normalizeKeys(v);
+          }
+          return out;
+        };
+
+        const normalized = data.map((row: any) => normalizeKeys(row));
         // Map rows to Job objects, handling `payload` if present and converting dates
-        const parsed: Job[] = data.map(parseJobRow);
+        const parsed: Job[] = normalized.map(parseJobRow);
         setJobs(parsed);
       } catch (err) {
         console.error("Supabase loadJobs error:", err);
