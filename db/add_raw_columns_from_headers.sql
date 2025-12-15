@@ -140,3 +140,12 @@ BEGIN
 END
 $$;
 
+-- Add a source_hash column to enable idempotent uploads and deduplication
+ALTER TABLE IF EXISTS public.bhiwani_service_jobs_raw
+ADD COLUMN IF NOT EXISTS source_hash TEXT;
+
+-- Create a unique index on source_hash for deduplication (only when not null)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bhiwani_raw_source_hash
+ON public.bhiwani_service_jobs_raw (source_hash)
+WHERE source_hash IS NOT NULL;
+
