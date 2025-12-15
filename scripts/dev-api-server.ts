@@ -1,3 +1,16 @@
+// Load environment variables from .env.local when running the local dev API server.
+// This lets you put SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY into .env.local
+// and have the API process pick them up when started via `npm run dev:api`.
+/* eslint-disable @typescript-eslint/no-var-requires */
+// Load dotenv if available, but don't crash if it's not installed yet.
+try {
+  require('dotenv').config();
+} catch (err) {
+  // dotenv is convenient for local dev but may not be installed in every environment.
+  // If it's missing, warn and continue; the user can run `npm install --save-dev dotenv`.
+  // eslint-disable-next-line no-console
+  console.warn('dotenv not installed; skipping .env.local load. Run `npm install --save-dev dotenv` to enable.');
+}
 import express from 'express';
 import bodyParser from 'body-parser';
 
@@ -5,16 +18,24 @@ import bodyParser from 'body-parser';
 // We use require to allow ts-node-dev to load them seamlessly. Handlers live in a
 // few locations in this repo (root /api for some legacy handlers, and src/Pages
 // for the newer TypeScript handlers). Require from both areas as needed.
-const uploadHandler = require('../api/upload-csv').default;
-const mappingHandler = require('../api/mapping_presets').default;
-const jobsHandler = require('../api/jobs').default;
-const healthHandler = require('../api/supabase-health').default;
+const _upload = require('../api/upload-csv');
+const uploadHandler = _upload && (_upload.default || _upload);
+const _mapping = require('../api/mapping_presets');
+const mappingHandler = _mapping && (_mapping.default || _mapping);
+const _jobs = require('../api/jobs');
+const jobsHandler = _jobs && (_jobs.default || _jobs);
+const _health = require('../api/supabase-health');
+const healthHandler = _health && (_health.default || _health);
 // Additional handlers we added under src/Pages
-const inventoryHandler = require('../src/Pages/api_inventory').default;
-const profilesHandler = require('../src/Pages/api_profiles').default;
-const quickMessagesHandler = require('../src/Pages/api_quick_messages').default;
-// existing metrics handler (JS) in root api folder
-const metricsHandler = require('../api/metrics').default;
+const _inventory = require('../src/Pages/api_inventory');
+const inventoryHandler = _inventory && (_inventory.default || _inventory);
+const _profiles = require('../src/Pages/api_profiles');
+const profilesHandler = _profiles && (_profiles.default || _profiles);
+const _quick = require('../src/Pages/api_quick_messages');
+const quickMessagesHandler = _quick && (_quick.default || _quick);
+// existing metrics handler (JS) in root api folder (CommonJS exports a function)
+const _metrics = require('../api/metrics');
+const metricsHandler = _metrics && (_metrics.default || _metrics);
 
 const app = express();
 app.use(bodyParser.json({ limit: '50mb' }));
