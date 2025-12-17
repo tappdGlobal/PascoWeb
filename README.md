@@ -1,9 +1,5 @@
 # PASCO Bodyshop Dashboard — PascoWeb
 
-Lightweight summary and run instructions for the PASCO Bodyshop Dashboard (PascoWeb).
-
-This repository contains a Vite + React + TypeScript single-page app and a small set of server-side API handlers that integrate with Supabase for persistence.
-
 Highlights in this release
 
 - CSV/XLSX upload with header-mapper and per-user mapping presets.
